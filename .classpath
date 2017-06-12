@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/esper"/>
+	<classpathentry kind="lib" path="D:/resource/kafka/kafka_2.12-0.10.2.0/libs/kafka-clients-0.10.2.0.jar"/>
+	<classpathentry kind="lib" path="D:/resource/json-20160810.jar"/>
+	<classpathentry kind="lib" path="D:/resource/hadoop/hadoop-2.7.3/share/hadoop/common/lib/commons-cli-1.2.jar"/>
+	<classpathentry kind="lib" path="D:/resource/commons-logging/commons-logging-1.2/commons-logging-1.2.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
