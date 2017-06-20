@@ -199,11 +199,15 @@ public class EsperKafkaAdapters {
 			e.printStackTrace();
 		}
 		
-		try {
+		/*try {
 			Thread.sleep(20000);
 		} catch (InterruptedException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
+		}*/
+		
+		while(true){
+			
 		}
 		
 		//adapters.close();
