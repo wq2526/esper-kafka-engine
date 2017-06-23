@@ -14,6 +14,8 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 
 import com.esper.client.EsperClient;
+import com.esper.kafka.records.EsperKafkaState;
+import com.esper.kafka.records.EsperKafkaStateManager;
 import com.espertech.esperio.kafka.EsperIOKafkaConfig;
 import com.espertech.esperio.kafka.EsperIOKafkaInputAdapter;
 import com.espertech.esperio.kafka.EsperIOKafkaOutputAdapter;
@@ -74,11 +76,12 @@ public class EsperKafkaAdapters {
 		CommandLine cliParser = new GnuParser().parse(opts, args);
 		
 		kafkaServer = cliParser.getOptionValue("kafka_server", "10.109.253.127:9092");
-		eventType = cliParser.getOptionValue("event_type", "person_event");
-		epl = cliParser.getOptionValue("epl", "select * from person_event");
+		eventType = cliParser.getOptionValue("event_type", "air_quality");
+		epl = cliParser.getOptionValue("epl", "select * from air_quality (parameter=<pm25>)");
+		epl = epl.replaceAll("<", "'");
 		groupId = cliParser.getOptionValue("group_id", "esper-group-test-id");
-		inputTopic = cliParser.getOptionValue("input_topic", "esper-test-input-topic");
-		outputTopic = cliParser.getOptionValue("output_topic", "esper-test-output-topic");
+		inputTopic = cliParser.getOptionValue("input_topic", "topic_0");
+		outputTopic = cliParser.getOptionValue("output_topic", "topic_1");
 		
 		LOG.info("prepare to add event type " + eventType + 
 				", with statement " + epl + 
@@ -86,15 +89,14 @@ public class EsperKafkaAdapters {
 				", from kafka " + kafkaServer + 
 				", send processed event to " + outputTopic);
 		
-		String[] eventProps = cliParser.getOptionValue("event_props", "event_type name age").split(" ");
-		String[] propClasses = cliParser.getOptionValue("prop_classes", "String String int").split(" ");
+		String[] eventProps = cliParser.getOptionValue("event_props", "parameter").split(" ");
+		String[] propClasses = cliParser.getOptionValue("prop_classes", "String").split(" ");
 		
 		if(eventProps.length!=propClasses.length){
 			throw new RuntimeException("The event prop num do not equal the prop class num");
 		}
 		
 		//set up the event definition
-		def.put("event_type", String.class);
 		for(int i=0;i<eventProps.length;i++){
 			Object c = new Object();
 			
@@ -151,13 +153,23 @@ public class EsperKafkaAdapters {
 		esperClient.addEventType(eventType, def);
 		LOG.info("add event type " + eventType);
 		
+		Map<String, Object> quite = new HashMap<String, Object>();
+		quite.put("quite", String.class);
+		esperClient.addEventType("quite", quite);
+		
 		//add the statement
 		esperClient.createStmt(epl);
 		LOG.info("create statement " + epl);
 		
+		esperClient.createStmt("select * from quite");
+		
+		EsperKafkaStateManager.STATE = EsperKafkaState.INIT;
+		
 	}
 	
 	public void start() {
+		
+		EsperKafkaStateManager.STATE = EsperKafkaState.STARTED;
 		
 		LOG.info("start the input adapter");
 		inputAdapter.start();
@@ -207,6 +219,27 @@ public class EsperKafkaAdapters {
 		}*/
 		
 		while(true){
+			
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			if(EsperKafkaStateManager.STATE==EsperKafkaState.FINISHED){
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				LOG.info("esper engine finish");
+				adapters.close();
+				System.exit(0);
+			}
+				
 			
 		}
 		

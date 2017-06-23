@@ -9,7 +9,10 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.json.JSONObject;
 
+import com.esper.kafka.records.EsperKafkaState;
+import com.esper.kafka.records.EsperKafkaStateManager;
 import com.espertech.esper.client.EPServiceProvider;
 import com.espertech.esper.client.EPStatement;
 import com.espertech.esper.client.EPStatementState;
@@ -28,6 +31,7 @@ public class EsperKafkaFlowController implements EsperIOKafkaOutputFlowControlle
 	private EPServiceProvider engine;
 	private Producer<String, String> producer;
 	private Set<String> topics;
+	
 
 	@Override
 	public void close() {
@@ -70,6 +74,7 @@ public class EsperKafkaFlowController implements EsperIOKafkaOutputFlowControlle
         
         // attach listener to receive newly-created statements
         engine.addStatementStateListener(new KafkaStatementListener());
+        
 
 	}
 	
@@ -94,7 +99,12 @@ public class EsperKafkaFlowController implements EsperIOKafkaOutputFlowControlle
 					LOG.info("send message to kafka " + json + 
 							", to topic " + topic);
 				}
+				if(new JSONObject(json).has("quite")){
+					EsperKafkaStateManager.STATE = EsperKafkaState.FINISHED;
+					LOG.info(EsperKafkaStateManager.STATE);
+				}
 			}
+			
 		}
 		
 	}
