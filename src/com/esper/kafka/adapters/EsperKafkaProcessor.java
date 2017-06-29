@@ -4,7 +4,6 @@ import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.json.JSONObject;
@@ -20,21 +19,17 @@ public class EsperKafkaProcessor implements EsperIOKafkaInputProcessor {
 	private static final Log LOG = LogFactory.getLog(EsperKafkaProcessor.class);
 	
 	private EPServiceProvider engine;
-	private Consumer<String, String> consumer;
 
 	@Override
 	public void close() {
 		// TODO Auto-generated method stub
-		consumer.close();
-		LOG.info("close kafka consumer");
+		LOG.info("close esper kafka processor");
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public void init(EsperIOKafkaInputProcessorContext context) {
 		// TODO Auto-generated method stub
 		engine = context.getEngine();
-		consumer = context.getConsumer();
 		LOG.info("processor init");
 	}
 
