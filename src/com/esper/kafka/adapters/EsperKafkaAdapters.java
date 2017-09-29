@@ -12,6 +12,8 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import com.esper.client.EsperClient;
 import com.esper.kafka.records.EsperKafkaState;
@@ -36,10 +38,10 @@ public class EsperKafkaAdapters {
 	private String kafkaServer;
 	private static String eventType;
 	private String epl;
+	private static String outType;
 	private String groupId;
 	private String inputTopic;
 	private String outputTopic;
-	private Map<String, Object> def;
 	
 	private Options opts;
 	
@@ -53,10 +55,10 @@ public class EsperKafkaAdapters {
 		kafkaServer = "";
 		eventType = "";
 		epl = "";
+		outType = "";
 		groupId = "";
 		inputTopic = "";
 		outputTopic = "";
-		def = new HashMap<String, Object>();
 		
 		opts = new Options();
 
@@ -67,6 +69,7 @@ public class EsperKafkaAdapters {
 		opts.addOption("kafka_server", true, "The kafka server address");
 		opts.addOption("event_type", true, "The event type to be processed");
 		opts.addOption("epl", true, "The epl to process the event");
+		opts.addOption("out_type", true, "The output event type");
 		opts.addOption("group_id", true, "The group id of the consumer");
 		opts.addOption("input_topic", true, "The topic to subscribe from kafka");
 		opts.addOption("output_topic", true, "The topic to publish to kafka");
@@ -77,8 +80,10 @@ public class EsperKafkaAdapters {
 		
 		kafkaServer = cliParser.getOptionValue("kafka_server", "10.109.253.127:9092");
 		eventType = cliParser.getOptionValue("event_type", "air_quality");
-		epl = cliParser.getOptionValue("epl", "select * from air_quality (parameter=<pm25>)");
-		epl = epl.replaceAll("<", "'");
+		eventType = eventType.replaceAll("%", "\"");
+		epl = cliParser.getOptionValue("epl", "select * from air_quality (parameter=$pm25$)");
+		epl = epl.replaceAll("$", "'").replaceAll("%", "\"");
+		outType = cliParser.getOptionValue("out_type", "air_quality");
 		groupId = cliParser.getOptionValue("group_id", "esper-group-test-id");
 		inputTopic = cliParser.getOptionValue("input_topic", "topic_0");
 		outputTopic = cliParser.getOptionValue("output_topic", "topic_1");
@@ -87,36 +92,66 @@ public class EsperKafkaAdapters {
 				", with statement " + epl + 
 				", from topic " + inputTopic + 
 				", from kafka " + kafkaServer + 
-				", send processed event to " + outputTopic);
+				", send processed event to " + outputTopic + 
+				", with out type " + outType);
 		
-		String[] eventProps = cliParser.getOptionValue("event_props", "parameter").split(" ");
-		String[] propClasses = cliParser.getOptionValue("prop_classes", "String").split(" ");
+		JSONArray events = new JSONArray(eventType);
+		JSONArray epls = new JSONArray(epl);
 		
-		if(eventProps.length!=propClasses.length){
-			throw new RuntimeException("The event prop num do not equal the prop class num");
-		}
-		
-		//set up the event definition
-		for(int i=0;i<eventProps.length;i++){
-			Object c = new Object();
+		for(int i=0;i<events.length();i++) {
+			Map<String, Object> def = new HashMap<String, Object>();
+			JSONObject event = events.getJSONObject(i);
+			String eventName = event.getString("event_type");
+			JSONArray eventProps = event.getJSONArray("event_props");
+			JSONArray propClasses = event.getJSONArray("event_classes");
 			
-			switch (propClasses[i]){
-			case "String" : c = String.class;break;
-			case "int" : c = int.class;break;
-			case "char" : c = char.class;break;
-			case "boolean" : c = boolean.class;break;
-			case "short" : c = short.class;break;
-			case "long" : c = long.class;break;
-			case "float" : c = float.class;break;
-			case "double" : c = double.class;break;
-			case "byte" : c = byte.class;break;
-			default : c = Object.class;break;
+			if(eventProps.length()!=propClasses.length()){
+				throw new RuntimeException("The event prop num do not equal the prop class num");
 			}
 			
-			def.put(eventProps[i], c);
+			//set up the event definition
+			for(int j=0;j<eventProps.length();j++){
+				Object c = new Object();
+				
+				switch (propClasses.getString(j)){
+				case "String" : c = String.class;break;
+				case "int" : c = int.class;break;
+				case "char" : c = char.class;break;
+				case "boolean" : c = boolean.class;break;
+				case "short" : c = short.class;break;
+				case "long" : c = long.class;break;
+				case "float" : c = float.class;break;
+				case "double" : c = double.class;break;
+				case "byte" : c = byte.class;break;
+				default : c = Object.class;break;
+				}
+				
+				def.put(eventProps.getString(j), c);
+				
+				LOG.info("Add event property " + 
+				eventProps.getString(j) + 
+				" with class " + c + 
+				"for event type " + eventName);
+			}
 			
-			LOG.info("Add event property " + eventProps[i] + " with class " + c);
+			//add the event type to esper engine
+			esperClient.addEventType(eventName, def);
+			LOG.info("add event type " + eventName);
 		}
+		
+		//add quit event
+		Map<String, Object> quit = new HashMap<String, Object>();
+		quit.put("quit", String.class);
+		esperClient.addEventType("quit", quit);
+		
+		for(int i=0;i<epls.length();i++) {
+			//add the statement
+			String stmt = epls.getString(i);
+			esperClient.createStmt(stmt);
+			LOG.info("create statement " + stmt);
+		}
+		
+		esperClient.createStmt("select * from quit");
 		
 		//configure the input adapter
 		inputProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServer);
@@ -149,20 +184,6 @@ public class EsperKafkaAdapters {
 		
 		LOG.info("successfully configure the output adapter");
 		
-		//add the event type
-		esperClient.addEventType(eventType, def);
-		LOG.info("add event type " + eventType);
-		
-		Map<String, Object> quite = new HashMap<String, Object>();
-		quite.put("quite", String.class);
-		esperClient.addEventType("quite", quite);
-		
-		//add the statement
-		esperClient.createStmt(epl);
-		LOG.info("create statement " + epl);
-		
-		esperClient.createStmt("select * from quite");
-		
 		EsperKafkaStateManager.STATE = EsperKafkaState.INIT;
 		
 	}
@@ -191,8 +212,8 @@ public class EsperKafkaAdapters {
 		return esperClient.getEngineURI();
 	}
 	
-	public static String getEventType() {
-		return eventType;
+	public static String getOutType() {
+		return outType;
 	}
 
 	public static void main(String[] args) {
