@@ -43,9 +43,9 @@ public class EsperKafkaProcessor implements EsperIOKafkaInputProcessor {
 			if(record.value()!=null){
 				LOG.info("here");
 				String json = record.value().toString();
+				LOG.info("receive message from kafka: " + json);
 				JSONObject jsonObj = new JSONObject(json);
 				String eventType = jsonObj.getString("event_type");
-				LOG.info("receive message from kafka: " + json);
 				Map<String, Object> event = jsonObj.toMap();
 				LOG.info("send event to esper engine: " + jsonObj.toString());
 				engine.getEPRuntime().sendEvent(event, eventType);	
