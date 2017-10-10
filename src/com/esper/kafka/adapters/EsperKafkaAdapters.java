@@ -141,6 +141,7 @@ public class EsperKafkaAdapters {
 		
 		//add quit event
 		Map<String, Object> quit = new HashMap<String, Object>();
+		quit.put("event_type", String.class);
 		quit.put("quit", String.class);
 		esperClient.addEventType("quit", quit);
 		
