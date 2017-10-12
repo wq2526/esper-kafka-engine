@@ -41,7 +41,6 @@ public class EsperKafkaProcessor implements EsperIOKafkaInputProcessor {
 		
 		for(ConsumerRecord<?, ?> record : records){
 			if(record.value()!=null){
-				LOG.info("here");
 				String json = record.value().toString();
 				LOG.info("receive message from kafka: " + json);
 				JSONObject jsonObj = new JSONObject(json);

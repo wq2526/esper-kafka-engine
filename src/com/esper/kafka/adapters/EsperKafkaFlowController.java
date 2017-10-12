@@ -95,19 +95,31 @@ public class EsperKafkaFlowController implements EsperIOKafkaOutputFlowControlle
 				String json = jsonEventRenderer.render(event);
 				LOG.info("receive event from esper engine: " + json);
 				JSONObject out = new JSONObject(json);
-				if(!out.has("event_type")){
-					out.put("event_type", EsperKafkaAdapters.getOutType());
-					json = out.toString();
-				}
 				
-				for(String topic : topics){
-					producer.send(new ProducerRecord<String, String>(topic, json));
-					LOG.info("send message to kafka " + json + 
-							", to topic " + topic);
-				}
 				if(out.has("quit")){
-					EsperKafkaStateManager.STATE = EsperKafkaState.FINISHED;
-					LOG.info(EsperKafkaStateManager.STATE);
+					EsperKafkaAdapters.QUITNUM--;
+					LOG.info("The quit num for node " + EsperKafkaAdapters.NODENAME +
+							" is " + EsperKafkaAdapters.QUITNUM);
+					if(EsperKafkaAdapters.QUITNUM==0){	
+						for(String topic : topics){
+							String quitmsg = "{\"event_type\":\"quit\",\"quit\":\"" + EsperKafkaAdapters.NODENAME + "\"}";
+							producer.send(new ProducerRecord<String, String>(topic, quitmsg));
+							LOG.info("send quit message to kafka " + quitmsg + 
+									", to topic " + topic);
+						}
+						EsperKafkaStateManager.STATE = EsperKafkaState.FINISHED;
+						LOG.info(EsperKafkaStateManager.STATE);
+					}
+				}else{
+					if(!out.has("event_type")){
+						out.put("event_type", EsperKafkaAdapters.getOutType());
+						json = out.toString();
+					}
+					for(String topic : topics){
+						producer.send(new ProducerRecord<String, String>(topic, json));
+						LOG.info("send message to kafka " + json + 
+								", to topic " + topic);
+					}
 				}
 			}
 			

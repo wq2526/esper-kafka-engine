@@ -42,6 +42,11 @@ public class EsperKafkaAdapters {
 	private String groupId;
 	private String inputTopic;
 	private String outputTopic;
+	private String parents;
+	
+	public static String NODENAME = "";
+	
+	public static int QUITNUM = 0;
 	
 	private Options opts;
 	
@@ -59,6 +64,7 @@ public class EsperKafkaAdapters {
 		groupId = "";
 		inputTopic = "";
 		outputTopic = "";
+		parents = "";
 		
 		opts = new Options();
 
@@ -73,8 +79,8 @@ public class EsperKafkaAdapters {
 		opts.addOption("group_id", true, "The group id of the consumer");
 		opts.addOption("input_topic", true, "The topic to subscribe from kafka");
 		opts.addOption("output_topic", true, "The topic to publish to kafka");
-		opts.addOption("event_props", true, "The event properties");
-		opts.addOption("prop_classes", true, "The classes of the properties");
+		opts.addOption("parents", true, "The parents of the node");
+		opts.addOption("node_name", true, "The name of the node");
 		
 		CommandLine cliParser = new GnuParser().parse(opts, args);
 		
@@ -87,13 +93,17 @@ public class EsperKafkaAdapters {
 		groupId = cliParser.getOptionValue("group_id", "esper-group-test-id");
 		inputTopic = cliParser.getOptionValue("input_topic", "topic_0");
 		outputTopic = cliParser.getOptionValue("output_topic", "topic_1");
+		parents = cliParser.getOptionValue("parents", "").replaceAll("%", "\"");
+		NODENAME = cliParser.getOptionValue("node_name", "");
 		
 		LOG.info("prepare to add event type " + eventType + 
 				", with statement " + epl + 
 				", from topic " + inputTopic + 
 				", from kafka " + kafkaServer + 
 				", send processed event to " + outputTopic + 
-				", with out type " + outType);
+				", with out type " + outType + 
+				", and parents " + parents + 
+				", for node " + NODENAME);
 		
 		JSONArray events = new JSONArray(eventType);
 		JSONArray epls = new JSONArray(epl);
@@ -136,7 +146,15 @@ public class EsperKafkaAdapters {
 			
 			//add the event type to esper engine
 			esperClient.addEventType(eventName, def);
-			LOG.info("add event type " + eventName);
+			LOG.info("add event type " + eventName + " for node " + EsperKafkaAdapters.NODENAME);
+		}
+		
+		//add epl
+		for(int i=0;i<epls.length();i++) {
+			//add the statement
+			String stmt = epls.getString(i);
+			esperClient.createStmt(stmt);
+			LOG.info("create statement " + stmt + " for node " + EsperKafkaAdapters.NODENAME);
 		}
 		
 		//add quit event
@@ -145,14 +163,15 @@ public class EsperKafkaAdapters {
 		quit.put("quit", String.class);
 		esperClient.addEventType("quit", quit);
 		
-		for(int i=0;i<epls.length();i++) {
-			//add the statement
-			String stmt = epls.getString(i);
-			esperClient.createStmt(stmt);
-			LOG.info("create statement " + stmt);
+		JSONArray parentsJson = new JSONArray(parents);
+		for(int i=0;i<parentsJson.length();i++){
+			String quitStmt = "select * from quit where quit=";
+			quitStmt = quitStmt + "\'" + parentsJson.getString(i) + "\'";
+			esperClient.createStmt(quitStmt);
+			LOG.info("create quit stmt: " + quitStmt);
 		}
-		
-		esperClient.createStmt("select * from quit");
+		QUITNUM = parentsJson.length();
+		LOG.info("The quit num of the node " + EsperKafkaAdapters.NODENAME + "is " + QUITNUM);
 		
 		//configure the input adapter
 		inputProp.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServer);
@@ -168,7 +187,7 @@ public class EsperKafkaAdapters {
 		
 		inputAdapter = new EsperIOKafkaInputAdapter(inputProp, esperClient.getEngineURI());
 		
-		LOG.info("successfully configure the input adapter");
+		LOG.info("successfully configure the input adapter for node " + EsperKafkaAdapters.NODENAME);
 		
 		//configure the output adapter
 		outputProp.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaServer);
@@ -183,7 +202,7 @@ public class EsperKafkaAdapters {
 		
 		outputAdapter = new EsperIOKafkaOutputAdapter(outputProp, esperClient.getEngineURI());
 		
-		LOG.info("successfully configure the output adapter");
+		LOG.info("successfully configure the output adapter for node " + EsperKafkaAdapters.NODENAME);
 		
 		EsperKafkaStateManager.STATE = EsperKafkaState.INIT;
 		
@@ -193,19 +212,19 @@ public class EsperKafkaAdapters {
 		
 		EsperKafkaStateManager.STATE = EsperKafkaState.STARTED;
 		
-		LOG.info("start the input adapter");
+		LOG.info("start the input adapter for node " + EsperKafkaAdapters.NODENAME);
 		inputAdapter.start();
 		
-		LOG.info("start the output adapter");
+		LOG.info("start the output adapter for node " + EsperKafkaAdapters.NODENAME);
 		outputAdapter.start();
 		
 	}
 	
 	public void close() {
-		LOG.info("close the input adapter");
+		LOG.info("close the input adapter for node " + EsperKafkaAdapters.NODENAME);
 		inputAdapter.destroy();
 		
-		LOG.info("close the output adapter");
+		LOG.info("close the output adapter for node " + EsperKafkaAdapters.NODENAME);
 		outputAdapter.destroy();
 	}
 	
@@ -223,10 +242,10 @@ public class EsperKafkaAdapters {
 		EsperKafkaAdapters adapters = new EsperKafkaAdapters();
 		
 		try {
-			LOG.info("Initializing esper adapters");
+			LOG.info("Initializing esper adapters for node " + EsperKafkaAdapters.NODENAME);
 			adapters.init(args);
 			
-			LOG.info("Start adapters");
+			LOG.info("Start adapters for node " + EsperKafkaAdapters.NODENAME);
 			adapters.start();
 		} catch (ParseException e) {
 			// TODO Auto-generated catch block
@@ -243,21 +262,14 @@ public class EsperKafkaAdapters {
 		while(true){
 			
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(100);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 			
 			if(EsperKafkaStateManager.STATE==EsperKafkaState.FINISHED){
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				
-				LOG.info("esper engine finish");
+				LOG.info("esper engine finish for node " + EsperKafkaAdapters.NODENAME);
 				adapters.close();
 				System.exit(0);
 			}
