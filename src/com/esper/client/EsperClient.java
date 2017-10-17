@@ -7,10 +7,10 @@ import com.espertech.esper.client.EPServiceProviderManager;
 
 public class EsperClient {
 	
-	private EPServiceProvider engine;
+	public static EPServiceProvider engine = EPServiceProviderManager.getDefaultProvider();
 	
 	public EsperClient() {
-		this.engine = EPServiceProviderManager.getDefaultProvider();
+		
 	}
 	
 	public String getEngineURI() {
