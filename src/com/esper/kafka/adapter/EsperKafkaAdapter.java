@@ -26,14 +26,14 @@ import com.esper.kafka.records.EsperKafkaStateManager;
 import com.kafka.client.KafkaConsumerClient;
 import com.kafka.client.KafkaProducerClient;
 
-public class EsperKafkaAdapter<K, V> {
+public class EsperKafkaAdapter {
 	
 	private static final Log LOG = LogFactory.getLog(EsperKafkaAdapter.class);
 	private ExecutorService exec;
 	
 	//The kafka client
-	private KafkaProducerClient<K, V> producer;
-	private KafkaConsumerClient<K, V> consumer;
+	private KafkaProducerClient<String, String> producer;
+	private KafkaConsumerClient<String, String> consumer;
 	
 	//esper client
 	private EsperClient esperClient;
@@ -49,8 +49,6 @@ public class EsperKafkaAdapter<K, V> {
 	private Set<String> parents;
 	
 	public static String NODENAME = "";
-	
-	public static int QUITNUM = 0;
 	
 	private Options opts;
 	
@@ -176,15 +174,22 @@ public class EsperKafkaAdapter<K, V> {
 			esperClient.createStmt(quitStmt);
 			LOG.info("create quit stmt: " + quitStmt);
 		}
-		QUITNUM = parentsJson.length();
-		LOG.info("The quit num of the node " + 
-				EsperKafkaAdapter.NODENAME + " is " + QUITNUM);
+		LOG.info("The num of parents of the node " + 
+				EsperKafkaAdapter.NODENAME + " is " + parents.size());
 		
 		//setup kafka client 
-		producer = new KafkaProducerClient<K, V>(kafkaServer, 9092);
+		producer = new KafkaProducerClient<String, String>(kafkaServer);
 		producer.addTopic(outputTopic);
-		consumer = new KafkaConsumerClient<K, V>(kafkaServer, 9092, groupId);
+		consumer = new KafkaConsumerClient<String, String>(kafkaServer, groupId);
 		consumer.addTopic(inputTopic);
+	}
+	
+	public KafkaProducerClient<String, String> getProducer() {
+		return producer;
+	}
+	
+	public KafkaConsumerClient<String, String> getConsumer() {
+		return consumer;
 	}
 	
 	public static String getOutType() {
@@ -198,10 +203,10 @@ public class EsperKafkaAdapter<K, V> {
 	
 	private class KafkaConsumerRunnable implements Runnable {
 		
-		private EsperKafkaConsumerListener<K, V> listener;
+		private EsperKafkaConsumerListener<String, String> listener;
 		
 		public KafkaConsumerRunnable() {
-			listener = new EsperKafkaConsumerListenerImpl<K, V>(parents);
+			listener = new EsperKafkaConsumerListenerImpl<String, String>(parents);
 		}
 
 		@Override
@@ -214,10 +219,10 @@ public class EsperKafkaAdapter<K, V> {
 	
 	private class KafkaProducerRunnable implements Runnable {
 		
-		private EsperKafkaProducerListener<K, V> listener;
+		private EsperKafkaProducerListener<String, String> listener;
 		
 		public KafkaProducerRunnable() {
-			listener = new EsperKafkaProducerListenerImpl<K, V>();
+			listener = new EsperKafkaProducerListenerImpl<String, String>(parents);
 		}
 
 		@Override
@@ -231,7 +236,7 @@ public class EsperKafkaAdapter<K, V> {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 		
-		EsperKafkaAdapter<String, String> adapter = new EsperKafkaAdapter<String, String>();
+		EsperKafkaAdapter adapter = new EsperKafkaAdapter();
 		
 		try{
 			adapter.init(args);
@@ -241,7 +246,9 @@ public class EsperKafkaAdapter<K, V> {
 			e.printStackTrace();
 		}
 		
-		while(EsperKafkaStateManager.STATE!=EsperKafkaState.FINISHED){
+		while(EsperKafkaStateManager.STATE!=EsperKafkaState.FINISHED
+				|| adapter.getProducer().getRunning() 
+				|| adapter.getConsumer().getRunning()){
 			
 			try {
 				Thread.sleep(200);

@@ -37,10 +37,10 @@ implements EsperKafkaConsumerListener<K, V> {
 				LOG.info("receive message from kafka: " + json);
 				JSONObject jsonObj = new JSONObject(json);
 				if(jsonObj.has("quit") && parents.contains(jsonObj.getString("quit"))){
-					EsperKafkaAdapter.QUITNUM--;
-					LOG.info("The quit num for node " + EsperKafkaAdapter.NODENAME +
-							" is " + EsperKafkaAdapter.QUITNUM);
-					if(EsperKafkaAdapter.QUITNUM==0){
+					parents.remove(jsonObj.getString("quit"));
+					LOG.info("The num of parents for node " + EsperKafkaAdapter.NODENAME +
+							" is " + parents.size());
+					if(parents.size()==0){
 						running = false;
 					}
 				}

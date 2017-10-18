@@ -1,5 +1,7 @@
 package com.esper.kafka.adapter;
 
+import java.util.Set;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.json.JSONObject;
@@ -19,6 +21,11 @@ implements EsperKafkaProducerListener<K, V> {
 	
 	private static final Log LOG = LogFactory.getLog(EsperKafkaProducerListenerImpl.class);
 	private KafkaProducerClient<K, V> producer;
+	private Set<String> parents;
+	
+	public EsperKafkaProducerListenerImpl(Set<String> parents) {
+		this.parents = parents;
+	}
 
 	@Override
 	public void init(KafkaProducerClient<K, V> producer) {
@@ -55,10 +62,10 @@ implements EsperKafkaProducerListener<K, V> {
 				JSONObject out = new JSONObject(json);
 				
 				if(out.has("quit")){
-					if(EsperKafkaAdapter.QUITNUM==0){
+					if(parents.size()==0){
 						String quitmsg = "{\"event_type\":\"quit\",\"quit\":\"" + EsperKafkaAdapter.NODENAME + "\"}";
 						producer.produce(null, (V) quitmsg);
-						LOG.info("send quit message to kafka " + quitmsg);
+						producer.setRunning(false);
 						producer.close();
 						EsperKafkaStateManager.STATE = EsperKafkaState.FINISHED;
 						LOG.info(EsperKafkaStateManager.STATE);
@@ -69,11 +76,10 @@ implements EsperKafkaProducerListener<K, V> {
 						json = out.toString();
 					}
 					producer.produce(null, (V) json);
-					LOG.info("send message to kafka " + json);
 				}
-			}
+			//}
 			
-		//}
+		}
 		
 	}
 

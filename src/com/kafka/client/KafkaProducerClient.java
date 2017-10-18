@@ -20,10 +20,10 @@ public class KafkaProducerClient<K, V> {
 	
 	private boolean running;
 	
-	public KafkaProducerClient(String server, int port){
+	public KafkaProducerClient(String server){
 		
 		props = new Properties();
-		props.put("bootstrap.servers", server + ":" + port);
+		props.put("bootstrap.servers", server);
 		props.put("acks", "all");
 		props.put("retries", 0);
 		props.put("batch.size", 16384);
@@ -36,23 +36,18 @@ public class KafkaProducerClient<K, V> {
 		
 		producer = new KafkaProducer<K, V>(props);
 		
-		LOG.info("set up kafka producer with server " + server + " and port " + port);
+		LOG.info("set up kafka producer with server " + server);
 		topics = new ArrayList<String>();
 		
 		running = true;
+		
 	}
 	
 	public void produce(K key, V value) {
 		
-		try{
-			for(String topic : topics){
-				LOG.info("send message " + value +" to topic " + topic);
-				producer.send(new ProducerRecord<K, V>(topic, key, value));
-			}
-		}catch(Exception e){
-			e.printStackTrace();
-		}finally{
-			
+		for(String topic : topics){
+			LOG.info("send message " + value +" to topic " + topic);
+			producer.send(new ProducerRecord<K, V>(topic, key, value));
 		}	
 		
 	}
@@ -60,6 +55,10 @@ public class KafkaProducerClient<K, V> {
 	public void addTopic(String topic) {
 		LOG.info("add topic " + topic + " for kafka producer");
 		topics.add(topic);
+	}
+	
+	public boolean getRunning() {
+		return running;
 	}
 	
 	public void setRunning(boolean running) {

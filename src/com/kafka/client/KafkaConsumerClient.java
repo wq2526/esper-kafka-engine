@@ -22,9 +22,9 @@ public class KafkaConsumerClient<K, V> {
 	
 	private boolean running;
 	
-	public KafkaConsumerClient(String server, int port, String groupId) {
+	public KafkaConsumerClient(String server, String groupId) {
 		props = new Properties();
-		props.put("bootstrap.servers", server + ":" + port);
+		props.put("bootstrap.servers", server);
 	    props.put("group.id", groupId);
 	    props.put("enable.auto.commit", "true");
 	    props.put("auto.commit.interval.ms", "1000");
@@ -35,35 +35,34 @@ public class KafkaConsumerClient<K, V> {
 		
 		consumer = new KafkaConsumer<K, V>(props);
 		
-		LOG.info("set up kafka consumer with server " + server + " and port " + port);
+		LOG.info("set up kafka consumer with server " + server);
 		topics = new ArrayList<String>();
 		
 		running = true;
+		
 	}
 	
 	public void consume(EsperKafkaConsumerListener<K, V> listener) {
 	    
-		try{
-			consumer.subscribe(topics);
-			LOG.info("kafka consumer start to consume");
-		    while (running) {
-		        ConsumerRecords<K, V> records = consumer.poll(100);
-		        setRunning(listener.process(records));
-		        LOG.info("kafka consumer is running:" + running);
-		    }
-		}catch(Exception e){
-			e.printStackTrace();
-		}finally{
-			LOG.info("close kafka consumer");
-			consumer.close();
-		}
-	    
+		consumer.subscribe(topics);
+		LOG.info("kafka consumer start to consume");
+	    while (running) {
+	        ConsumerRecords<K, V> records = consumer.poll(100);
+	        setRunning(listener.process(records));
+	        //LOG.info("kafka consumer is running:" + running);
+	    }
+	    LOG.info("close kafka consumer");
+		consumer.close();
 		
 	}
 	
 	public void addTopic(String topic) {
 		LOG.info("add topic " + topic + " for kafka consumer");
 		topics.add(topic);
+	}
+	
+	public boolean getRunning() {
+		return running;
 	}
 	
 	public void setRunning(boolean running) {
