@@ -44,8 +44,6 @@ public class EsperKafkaAdapter {
 	private String epl;
 	private static String outType;
 	private String groupId;
-	private String inputTopic;
-	private String outputTopic;
 	private Set<String> parents;
 	
 	public static String NODENAME = "";
@@ -62,8 +60,6 @@ public class EsperKafkaAdapter {
 		epl = "";
 		outType = "";
 		groupId = "";
-		inputTopic = "";
-		outputTopic = "";
 		parents = new HashSet<String>();
 		
 		opts = new Options();
@@ -74,9 +70,6 @@ public class EsperKafkaAdapter {
 		opts.addOption("event_type", true, "The event type to be processed");
 		opts.addOption("epl", true, "The epl to process the event");
 		opts.addOption("out_type", true, "The output event type");
-		opts.addOption("group_id", true, "The group id of the consumer");
-		opts.addOption("input_topic", true, "The topic to subscribe from kafka");
-		opts.addOption("output_topic", true, "The topic to publish to kafka");
 		opts.addOption("parents", true, "The parents of the node");
 		opts.addOption("node_name", true, "The name of the node");
 		
@@ -88,22 +81,23 @@ public class EsperKafkaAdapter {
 		epl = cliParser.getOptionValue("epl", "select * from air_quality (parameter=$pm25$)");
 		epl = epl.replaceAll("$", "'").replaceAll("%", "\"");
 		outType = cliParser.getOptionValue("out_type", "air_quality");
-		groupId = cliParser.getOptionValue("group_id", "esper-group-test-id");
-		inputTopic = cliParser.getOptionValue("input_topic", "topic-0");
-		outputTopic = cliParser.getOptionValue("output_topic", "topic-1");
+
 		String parentsstr = cliParser.getOptionValue("parents", "").replaceAll("%", "\"");
 		NODENAME = cliParser.getOptionValue("node_name", "");
+		groupId = NODENAME + "-group-id";
 		
 		Logger.getLogger(EsperKafkaAdapter.class);
 		FileAppender appender = (FileAppender) Logger.getRootLogger().getAppender("file");
 		appender.setFile("/usr/esper/logs/esper-logs-" + NODENAME + ".log");
 		appender.activateOptions();
 		
+		//setup kafka client 
+		producer = new KafkaProducerClient<String, String>(kafkaServer);
+		consumer = new KafkaConsumerClient<String, String>(kafkaServer, groupId);	
+		
 		LOG.info("prepare to add event type " + eventType + 
-				", with statement " + epl + 
-				", from topic " + inputTopic + 
+				", with statement " + epl +  
 				", from kafka " + kafkaServer + 
-				", send processed event to " + outputTopic + 
 				", with out type " + outType + 
 				", and parents " + parentsstr + 
 				", for node " + NODENAME);
@@ -168,7 +162,9 @@ public class EsperKafkaAdapter {
 		
 		JSONArray parentsJson = new JSONArray(parentsstr);
 		for(int i=0;i<parentsJson.length();i++){
-			parents.add(parentsJson.getString(i));
+			String pNode = parentsJson.getString(i);
+			consumer.addTopic(pNode + "-topic");
+			parents.add(pNode);
 			String quitStmt = "select * from quit where quit=";
 			quitStmt = quitStmt + "\'" + parentsJson.getString(i) + "\'";
 			esperClient.createStmt(quitStmt);
@@ -177,11 +173,8 @@ public class EsperKafkaAdapter {
 		LOG.info("The num of parents of the node " + 
 				EsperKafkaAdapter.NODENAME + " is " + parents.size());
 		
-		//setup kafka client 
-		producer = new KafkaProducerClient<String, String>(kafkaServer);
-		producer.addTopic(outputTopic);
-		consumer = new KafkaConsumerClient<String, String>(kafkaServer, groupId);
-		consumer.addTopic(inputTopic);
+		
+		producer.addTopic(EsperKafkaAdapter.NODENAME + "-topic");
 	}
 	
 	public KafkaProducerClient<String, String> getProducer() {
