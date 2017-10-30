@@ -34,7 +34,7 @@ implements EsperKafkaConsumerListener<K, V> {
 		for(ConsumerRecord<?, ?> record : records){
 			if(record.value()!=null){
 				String json = record.value().toString();
-				LOG.info("receive message from kafka: " + json);
+				//LOG.info("receive message from kafka: " + json);
 				JSONObject jsonObj = new JSONObject(json);
 				if(jsonObj.has("quit") && parents.contains(jsonObj.getString("quit"))){
 					parents.remove(jsonObj.getString("quit"));
@@ -46,7 +46,7 @@ implements EsperKafkaConsumerListener<K, V> {
 				}
 				String eventType = jsonObj.getString("event_type");
 				Map<String, Object> event = jsonObj.toMap();
-				LOG.info("send event to esper engine: " + jsonObj.toString());
+				//LOG.info("send event to esper engine: " + jsonObj.toString());
 				EsperClient.engine.getEPRuntime().sendEvent(event, eventType);	
 			}
 		}

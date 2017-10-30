@@ -46,7 +46,7 @@ public class KafkaProducerClient<K, V> {
 	public void produce(K key, V value) {
 		
 		for(String topic : topics){
-			LOG.info("send message " + value +" to topic " + topic);
+			//LOG.info("send message " + value +" to topic " + topic);
 			producer.send(new ProducerRecord<K, V>(topic, key, value));
 		}	
 		

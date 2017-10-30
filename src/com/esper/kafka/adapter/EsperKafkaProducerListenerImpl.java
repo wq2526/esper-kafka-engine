@@ -58,7 +58,7 @@ implements EsperKafkaProducerListener<K, V> {
 			if(newEvents==null)return;
 			//for(EventBean event : newEvents){
 				String json = jsonEventRenderer.render(newEvents[0]);
-				LOG.info("receive event from esper engine: " + json);
+				//LOG.info("receive event from esper engine: " + json);
 				JSONObject out = new JSONObject(json);
 				
 				if(out.has("quit")){
