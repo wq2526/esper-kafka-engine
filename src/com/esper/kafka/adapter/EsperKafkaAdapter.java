@@ -199,7 +199,7 @@ public class EsperKafkaAdapter {
 		private EsperKafkaConsumerListener<String, String> listener;
 		
 		public KafkaConsumerRunnable() {
-			listener = new EsperKafkaConsumerListenerImpl<String, String>(parents);
+			listener = new EsperKafkaConsumerListenerImpl<String, String>(parents, esperClient);
 		}
 
 		@Override

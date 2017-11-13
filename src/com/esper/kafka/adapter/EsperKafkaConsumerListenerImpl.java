@@ -19,9 +19,11 @@ implements EsperKafkaConsumerListener<K, V> {
 	
 	private static final Log LOG = LogFactory.getLog(EsperKafkaConsumerListenerImpl.class);
 	private Set<String> parents;
+	private EsperClient esperClient;
 	
-	public EsperKafkaConsumerListenerImpl(Set<String> parents) {
+	public EsperKafkaConsumerListenerImpl(Set<String> parents, EsperClient esperClient) {
 		this.parents = parents;
+		this.esperClient = esperClient;
 	}
 
 	@Override
@@ -47,7 +49,7 @@ implements EsperKafkaConsumerListener<K, V> {
 				String eventType = jsonObj.getString("event_type");
 				Map<String, Object> event = jsonObj.toMap();
 				//LOG.info("send event to esper engine: " + jsonObj.toString());
-				EsperClient.engine.getEPRuntime().sendEvent(event, eventType);	
+				esperClient.sendEvent(event, eventType);	
 			}
 		}
 		
