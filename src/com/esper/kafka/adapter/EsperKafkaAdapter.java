@@ -70,6 +70,7 @@ public class EsperKafkaAdapter {
 		opts.addOption("event_type", true, "The event type to be processed");
 		opts.addOption("epl", true, "The epl to process the event");
 		opts.addOption("out_type", true, "The output event type");
+		opts.addOption("children", true, "The children of the node");
 		opts.addOption("parents", true, "The parents of the node");
 		opts.addOption("node_name", true, "The name of the node");
 		
@@ -82,6 +83,7 @@ public class EsperKafkaAdapter {
 		epl = epl.replaceAll("$", "'").replaceAll("%", "\"");
 		outType = cliParser.getOptionValue("out_type", "air_quality");
 
+		String childrenstr = cliParser.getOptionValue("children", "").replaceAll("%", "\"");
 		String parentsstr = cliParser.getOptionValue("parents", "").replaceAll("%", "\"");
 		NODENAME = cliParser.getOptionValue("node_name", "");
 		groupId = NODENAME + "-group-id";
@@ -94,11 +96,13 @@ public class EsperKafkaAdapter {
 		//setup kafka client 
 		producer = new KafkaProducerClient<String, String>(kafkaServer);
 		consumer = new KafkaConsumerClient<String, String>(kafkaServer, groupId);	
+		consumer.addTopic(NODENAME + "-topic");
 		
 		LOG.info("prepare to add event type " + eventType + 
 				", with statement " + epl +  
 				", from kafka " + kafkaServer + 
 				", with out type " + outType + 
+				", and children " + childrenstr + 
 				", and parents " + parentsstr + 
 				", for node " + NODENAME);
 		
@@ -160,10 +164,17 @@ public class EsperKafkaAdapter {
 		quit.put("quit", String.class);
 		esperClient.addEventType("quit", quit);
 		
+		JSONArray childrenJson = new JSONArray(childrenstr);
+		for(int i=0;i<childrenJson.length();i++){
+			String cNode = childrenJson.getString(i);
+			producer.addTopic(cNode + "-topic");
+		}
+		LOG.info("The num of children of the node " + 
+				EsperKafkaAdapter.NODENAME + " is " + childrenJson.length());
+		
 		JSONArray parentsJson = new JSONArray(parentsstr);
 		for(int i=0;i<parentsJson.length();i++){
 			String pNode = parentsJson.getString(i);
-			consumer.addTopic(pNode + "-topic");
 			parents.add(pNode);
 			String quitStmt = "select * from quit where quit=";
 			quitStmt = quitStmt + "\'" + parentsJson.getString(i) + "\'";
@@ -173,8 +184,6 @@ public class EsperKafkaAdapter {
 		LOG.info("The num of parents of the node " + 
 				EsperKafkaAdapter.NODENAME + " is " + parents.size());
 		
-		
-		producer.addTopic(EsperKafkaAdapter.NODENAME + "-topic");
 	}
 	
 	public KafkaProducerClient<String, String> getProducer() {

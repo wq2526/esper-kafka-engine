@@ -28,6 +28,7 @@ public class KafkaConsumerClient<K, V> {
 	    props.put("group.id", groupId);
 	    props.put("enable.auto.commit", "true");
 	    props.put("auto.commit.interval.ms", "1000");
+	    props.put("auto.offset.reset", "earliest");
 	    props.put("key.deserializer", 
 	    		"org.apache.kafka.common.serialization.StringDeserializer");
 	    props.put("value.deserializer", 
