@@ -1,8 +1,11 @@
 package com.esper.kafka.adapter;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,7 +49,7 @@ public class EsperKafkaAdapter {
 	private String groupId;
 	private Set<String> parents;
 	
-	public static String NODENAME = "";
+	public static String VERTEXNAME = "";
 	
 	private Options opts;
 	
@@ -55,7 +58,6 @@ public class EsperKafkaAdapter {
 		
 		esperClient = new EsperClient();		
 		
-		kafkaServer = "";
 		eventType = "";
 		epl = "";
 		outType = "";
@@ -63,20 +65,33 @@ public class EsperKafkaAdapter {
 		parents = new HashSet<String>();
 		
 		opts = new Options();
+		
+		Properties prop = new Properties();
+		InputStream input = EsperKafkaAdapter.class.
+				getClassLoader().getResourceAsStream("cep.properties");
+		try {
+			prop.load(input);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			LOG.error("read cep properties error", e);
+		}
+		
+		String host = prop.getProperty("kafka.host");
+		String port = prop.getProperty("kafka.port");
+		kafkaServer = host + ":" + port;
 	}
 	
 	public void init(String[] args) throws ParseException {
-		opts.addOption("kafka_server", true, "The kafka server address");
+		
 		opts.addOption("event_type", true, "The event type to be processed");
 		opts.addOption("epl", true, "The epl to process the event");
 		opts.addOption("out_type", true, "The output event type");
 		opts.addOption("children", true, "The children of the node");
 		opts.addOption("parents", true, "The parents of the node");
-		opts.addOption("node_name", true, "The name of the node");
+		opts.addOption("vertex_name", true, "The name of the node");
 		
 		CommandLine cliParser = new GnuParser().parse(opts, args);
 		
-		kafkaServer = cliParser.getOptionValue("kafka_server", "10.109.253.127:9092");
 		eventType = cliParser.getOptionValue("event_type", "air_quality");
 		eventType = eventType.replaceAll("%", "\"");
 		epl = cliParser.getOptionValue("epl", "select * from air_quality (parameter=$pm25$)");
@@ -85,18 +100,18 @@ public class EsperKafkaAdapter {
 
 		String childrenstr = cliParser.getOptionValue("children", "").replaceAll("%", "\"");
 		String parentsstr = cliParser.getOptionValue("parents", "").replaceAll("%", "\"");
-		NODENAME = cliParser.getOptionValue("node_name", "");
-		groupId = NODENAME + "-group-id";
+		VERTEXNAME = cliParser.getOptionValue("vertex_name", "");
+		groupId = VERTEXNAME + "-group-id";
 		
 		Logger.getLogger(EsperKafkaAdapter.class);
 		FileAppender appender = (FileAppender) Logger.getRootLogger().getAppender("file");
-		appender.setFile("/usr/esper/logs/esper-logs-" + NODENAME + ".log");
+		appender.setFile("/usr/esper/logs/esper-logs-" + VERTEXNAME + ".log");
 		appender.activateOptions();
 		
 		//setup kafka client 
 		producer = new KafkaProducerClient<String, String>(kafkaServer);
 		consumer = new KafkaConsumerClient<String, String>(kafkaServer, groupId);	
-		consumer.addTopic(NODENAME + "-topic");
+		consumer.addTopic(VERTEXNAME + "-topic");
 		
 		LOG.info("prepare to add event type " + eventType + 
 				", with statement " + epl +  
@@ -104,7 +119,7 @@ public class EsperKafkaAdapter {
 				", with out type " + outType + 
 				", and children " + childrenstr + 
 				", and parents " + parentsstr + 
-				", for node " + NODENAME);
+				", for node " + VERTEXNAME);
 		
 		JSONArray events = new JSONArray(eventType);
 		JSONArray epls = new JSONArray(epl);
@@ -147,7 +162,7 @@ public class EsperKafkaAdapter {
 			
 			//add the event type to esper engine
 			esperClient.addEventType(eventName, def);
-			LOG.info("add event type " + eventName + " for node " + EsperKafkaAdapter.NODENAME);
+			LOG.info("add event type " + eventName + " for node " + EsperKafkaAdapter.VERTEXNAME);
 		}
 		
 		//add epl
@@ -155,7 +170,7 @@ public class EsperKafkaAdapter {
 			//add the statement
 			String stmt = epls.getString(i);
 			esperClient.createStmt(stmt);
-			LOG.info("create statement " + stmt + " for node " + EsperKafkaAdapter.NODENAME);
+			LOG.info("create statement " + stmt + " for node " + EsperKafkaAdapter.VERTEXNAME);
 		}
 		
 		//add quit event
@@ -170,7 +185,7 @@ public class EsperKafkaAdapter {
 			producer.addTopic(cNode + "-topic");
 		}
 		LOG.info("The num of children of the node " + 
-				EsperKafkaAdapter.NODENAME + " is " + childrenJson.length());
+				EsperKafkaAdapter.VERTEXNAME + " is " + childrenJson.length());
 		
 		JSONArray parentsJson = new JSONArray(parentsstr);
 		for(int i=0;i<parentsJson.length();i++){
@@ -182,7 +197,7 @@ public class EsperKafkaAdapter {
 			LOG.info("create quit stmt: " + quitStmt);
 		}
 		LOG.info("The num of parents of the node " + 
-				EsperKafkaAdapter.NODENAME + " is " + parents.size());
+				EsperKafkaAdapter.VERTEXNAME + " is " + parents.size());
 		
 	}
 	
@@ -261,7 +276,7 @@ public class EsperKafkaAdapter {
 			
 		}
 		
-		LOG.info("esper engine finish for node " + EsperKafkaAdapter.NODENAME);
+		LOG.info("esper engine finish for node " + EsperKafkaAdapter.VERTEXNAME);
 		System.exit(0);
 
 	}

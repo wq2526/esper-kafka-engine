@@ -63,7 +63,8 @@ implements EsperKafkaProducerListener<K, V> {
 				
 				if(out.has("quit")){
 					if(parents.size()==0){
-						String quitmsg = "{\"event_type\":\"quit\",\"quit\":\"" + EsperKafkaAdapter.NODENAME + "\"}";
+						String quitmsg = "{\"event_type\":\"quit\",\"quit\":\"" + 
+								EsperKafkaAdapter.VERTEXNAME + "\"}";
 						producer.produce(null, (V) quitmsg);
 						producer.setRunning(false);
 						producer.close();
