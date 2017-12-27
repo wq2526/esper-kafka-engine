@@ -42,7 +42,11 @@ public class EsperKafkaAdapter {
 	private EsperClient esperClient;
 	
 	//The information to process a event
-	private String kafkaServer;
+	private String inputServer;
+	private String outputServer;
+	private String inputTopics;
+	private String outputTopics;
+	
 	private static String eventType;
 	private String epl;
 	private static String outType;
@@ -66,19 +70,10 @@ public class EsperKafkaAdapter {
 		
 		opts = new Options();
 		
-		Properties prop = new Properties();
-		InputStream input = EsperKafkaAdapter.class.
-				getClassLoader().getResourceAsStream("cep.properties");
-		try {
-			prop.load(input);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			LOG.error("read cep properties error", e);
-		}
-		
-		String host = prop.getProperty("kafka.host");
-		String port = prop.getProperty("kafka.port");
-		kafkaServer = host + ":" + port;
+		inputServer = "";
+		outputServer = "";
+		inputTopics = "";
+		outputTopics = "";
 	}
 	
 	public void init(String[] args) throws ParseException {
@@ -86,9 +81,13 @@ public class EsperKafkaAdapter {
 		opts.addOption("event_type", true, "The event type to be processed");
 		opts.addOption("epl", true, "The epl to process the event");
 		opts.addOption("out_type", true, "The output event type");
-		opts.addOption("children", true, "The children of the node");
-		opts.addOption("parents", true, "The parents of the node");
-		opts.addOption("vertex_name", true, "The name of the node");
+		opts.addOption("children", true, "The children of the vertex");
+		opts.addOption("parents", true, "The parents of the vertex");
+		opts.addOption("vertex_name", true, "The name of the vertex");
+		opts.addOption("input_server", true, "the input kafka server");
+		opts.addOption("output_server", true, "the output kafka server");
+		opts.addOption("input_topics", true, "the input topics");
+		opts.addOption("output_topics", true, "the output topics");
 		
 		CommandLine cliParser = new GnuParser().parse(opts, args);
 		
@@ -103,23 +102,27 @@ public class EsperKafkaAdapter {
 		VERTEXNAME = cliParser.getOptionValue("vertex_name", "");
 		groupId = VERTEXNAME + "-group-id";
 		
+		inputServer = cliParser.getOptionValue("input_server", "10.109.253.145:9092");
+		outputServer = cliParser.getOptionValue("output_server", "10.109.253.145:9092");
+		inputTopics = cliParser.getOptionValue("input_topics", "");
+		outputTopics = cliParser.getOptionValue("output_topics", "");
+		
 		Logger.getLogger(EsperKafkaAdapter.class);
 		FileAppender appender = (FileAppender) Logger.getRootLogger().getAppender("file");
 		appender.setFile("/usr/esper/logs/esper-logs-" + VERTEXNAME + ".log");
 		appender.activateOptions();
 		
 		//setup kafka client 
-		producer = new KafkaProducerClient<String, String>(kafkaServer);
-		consumer = new KafkaConsumerClient<String, String>(kafkaServer, groupId);	
-		consumer.addTopic(VERTEXNAME + "-topic");
+		producer = new KafkaProducerClient<String, String>(outputServer);
+		consumer = new KafkaConsumerClient<String, String>(inputServer, groupId);
 		
 		LOG.info("prepare to add event type " + eventType + 
 				", with statement " + epl +  
-				", from kafka " + kafkaServer + 
+				", from kafka " + inputServer + 
 				", with out type " + outType + 
 				", and children " + childrenstr + 
 				", and parents " + parentsstr + 
-				", for node " + VERTEXNAME);
+				", for vertex " + VERTEXNAME);
 		
 		JSONArray events = new JSONArray(eventType);
 		JSONArray epls = new JSONArray(epl);
@@ -162,7 +165,7 @@ public class EsperKafkaAdapter {
 			
 			//add the event type to esper engine
 			esperClient.addEventType(eventName, def);
-			LOG.info("add event type " + eventName + " for node " + EsperKafkaAdapter.VERTEXNAME);
+			LOG.info("add event type " + eventName + " for vertex " + EsperKafkaAdapter.VERTEXNAME);
 		}
 		
 		//add epl
@@ -170,7 +173,7 @@ public class EsperKafkaAdapter {
 			//add the statement
 			String stmt = epls.getString(i);
 			esperClient.createStmt(stmt);
-			LOG.info("create statement " + stmt + " for node " + EsperKafkaAdapter.VERTEXNAME);
+			LOG.info("create statement " + stmt + " for vertex " + EsperKafkaAdapter.VERTEXNAME);
 		}
 		
 		//add quit event
@@ -179,25 +182,39 @@ public class EsperKafkaAdapter {
 		quit.put("quit", String.class);
 		esperClient.addEventType("quit", quit);
 		
-		JSONArray childrenJson = new JSONArray(childrenstr);
-		for(int i=0;i<childrenJson.length();i++){
-			String cNode = childrenJson.getString(i);
-			producer.addTopic(cNode + "-topic");
-		}
-		LOG.info("The num of children of the node " + 
-				EsperKafkaAdapter.VERTEXNAME + " is " + childrenJson.length());
-		
 		JSONArray parentsJson = new JSONArray(parentsstr);
 		for(int i=0;i<parentsJson.length();i++){
-			String pNode = parentsJson.getString(i);
-			parents.add(pNode);
+			String pVertex = parentsJson.getString(i);
+			parents.add(pVertex);
 			String quitStmt = "select * from quit where quit=";
 			quitStmt = quitStmt + "\'" + parentsJson.getString(i) + "\'";
 			esperClient.createStmt(quitStmt);
 			LOG.info("create quit stmt: " + quitStmt);
 		}
-		LOG.info("The num of parents of the node " + 
+		LOG.info("The num of parents of the vertex " + 
 				EsperKafkaAdapter.VERTEXNAME + " is " + parents.size());
+		if(parentsJson.length()==0){
+			parents.add("start");
+			String quitStmt = "select * from quit where quit=\'start\'";
+			esperClient.createStmt(quitStmt);
+			LOG.info("create quit stmt for first vertex:" + quitStmt);
+		}
+		
+		//add topics to producer and consumer
+		JSONArray childrenJson = new JSONArray(childrenstr);
+		for(int i=0;i<childrenJson.length();i++){
+			String cVertex = childrenJson.getString(i);
+			producer.addTopic(cVertex + "-topic");
+		}
+		producer.addTopic(outputTopics);
+		LOG.info("The num of children of the vertex " + 
+				EsperKafkaAdapter.VERTEXNAME + " is " + childrenJson.length());
+		
+		if(parentsJson.length()==0){
+			consumer.addTopic(inputTopics);
+		}else{
+			consumer.addTopic(VERTEXNAME + "-topic");
+		}
 		
 	}
 	
@@ -276,7 +293,7 @@ public class EsperKafkaAdapter {
 			
 		}
 		
-		LOG.info("esper engine finish for node " + EsperKafkaAdapter.VERTEXNAME);
+		LOG.info("esper engine finish for vertex " + EsperKafkaAdapter.VERTEXNAME);
 		System.exit(0);
 
 	}

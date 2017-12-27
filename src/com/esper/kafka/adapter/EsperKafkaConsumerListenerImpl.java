@@ -40,7 +40,7 @@ implements EsperKafkaConsumerListener<K, V> {
 				JSONObject jsonObj = new JSONObject(json);
 				if(jsonObj.has("quit") && parents.contains(jsonObj.getString("quit"))){
 					parents.remove(jsonObj.getString("quit"));
-					LOG.info("The num of parents for node " + EsperKafkaAdapter.VERTEXNAME +
+					LOG.info("The num of parents for vertex " + EsperKafkaAdapter.VERTEXNAME +
 							" is " + parents.size());
 					if(parents.size()==0){
 						running = false;
