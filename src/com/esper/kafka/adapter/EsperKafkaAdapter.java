@@ -76,7 +76,7 @@ public class EsperKafkaAdapter {
 		outputTopics = "";
 	}
 	
-	public void init(String[] args) throws ParseException {
+	public void init(String[] args) {
 		
 		opts.addOption("event_type", true, "The event type to be processed");
 		opts.addOption("epl", true, "The epl to process the event");
@@ -89,7 +89,14 @@ public class EsperKafkaAdapter {
 		opts.addOption("input_topics", true, "the input topics");
 		opts.addOption("output_topics", true, "the output topics");
 		
-		CommandLine cliParser = new GnuParser().parse(opts, args);
+		CommandLine cliParser = null;
+		try {
+			cliParser = new GnuParser().parse(opts, args);
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			LOG.error("parse cep engine command error", e);
+			System.exit(-1);
+		}
 		
 		eventType = cliParser.getOptionValue("event_type", "air_quality");
 		eventType = eventType.replaceAll("%", "\"");
@@ -206,7 +213,9 @@ public class EsperKafkaAdapter {
 			String cVertex = childrenJson.getString(i);
 			producer.addTopic(cVertex + "-topic");
 		}
-		producer.addTopic(outputTopics);
+		if(childrenJson.length()==0){
+			producer.addTopic(outputTopics);
+		}	
 		LOG.info("The num of children of the vertex " + 
 				EsperKafkaAdapter.VERTEXNAME + " is " + childrenJson.length());
 		
@@ -272,13 +281,8 @@ public class EsperKafkaAdapter {
 		
 		EsperKafkaAdapter adapter = new EsperKafkaAdapter();
 		
-		try{
-			adapter.init(args);
-			adapter.start();
-		}catch (ParseException e){
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		adapter.init(args);
+		adapter.start();
 		
 		while(EsperKafkaStateManager.STATE!=EsperKafkaState.FINISHED
 				|| adapter.getProducer().getRunning() 
